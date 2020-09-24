@@ -140,7 +140,7 @@ print('Embedding Dimensions is (batch_size, max length of string, final dimensio
 encoder_lstm1 = LSTM(latent_dim,return_sequences=True,return_state=True) 
 encoder_output1, state_h1, state_c1 = encoder_lstm1(enc_emb) 
 
-print('LSTM output Dimensions are (batch_size, max length of string, final dimension embedding): ', encoder_output1.shape)
+print('\nLSTM output Dimensions are (batch_size, max length of string, final dimension embedding): ', encoder_output1.shape)
 print('Hidden state (h) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_h1.shape)
 print('Carry or Cell state (c) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_c1.shape)
 
@@ -158,12 +158,14 @@ decoder_inputs = Input(shape=(None,))
 dec_emb_layer = Embedding(y_voc_size, latent_dim,trainable=True) 
 dec_emb = dec_emb_layer(decoder_inputs) 
 
-print('Embedding Dimensions for summary is (batch_size, max length of string, final dimension embedding): ', dec_emb.shape)
+print('\nEmbedding Dimensions for summary is (batch_size, max length of string, final dimension embedding): ', dec_emb.shape)
 
 #LSTM using encoder_states as initial state
 decoder_lstm = LSTM(latent_dim, return_sequences=True, return_state=True) 
 decoder_outputs,decoder_fwd_state, decoder_back_state = decoder_lstm(dec_emb,initial_state=[state_h, state_c]) 
 
-print('LSTM decoder Dimensions are (batch_size, max length of string, final dimension embedding): ', decoder_outputs.shape)
+print('\nLSTM decoder Dimensions are (batch_size, max length of string, final dimension embedding): ', decoder_outputs.shape)
 print('Hidden state (h) decoder Dimensions are (batch_size, max length of string, final dimension embedding): ', decoder_fwd_state.shape)
 print('Carry or Cell state (c) decoder Dimensions are (batch_size, max length of string, final dimension embedding): ', decoder_back_state.shape)
+
+attention_layer = Attention()([encoder_outputs, decoder_outputs])
