@@ -1,5 +1,6 @@
-import numpy as np  
-import pandas as pd 
+import numpy as np 
+import pandas as pd
+from matplotlib import pyplot
 import re           
 from bs4 import BeautifulSoup 
 from sklearn.model_selection import train_test_split
@@ -168,4 +169,26 @@ print('\nLSTM decoder Dimensions are (batch_size, max length of string, final di
 print('Hidden state (h) decoder Dimensions are (batch_size, max length of string, final dimension embedding): ', decoder_fwd_state.shape)
 print('Carry or Cell state (c) decoder Dimensions are (batch_size, max length of string, final dimension embedding): ', decoder_back_state.shape)
 
-attention_layer = Attention()([encoder_outputs, decoder_outputs])
+attn_out = Attention()([encoder_outputs, decoder_outputs])
+
+# Concat attention output and decoder LSTM output 
+decoder_concat_input = Concatenate(axis=-1, name='concat_layer')([decoder_outputs, attn_out])
+
+#Dense layer
+decoder_dense = TimeDistributed(Dense(y_voc_size, activation='softmax')) 
+decoder_outputs = decoder_dense(decoder_concat_input)
+
+
+# Define the model
+model = Model([encoder_inputs, decoder_inputs], decoder_outputs) 
+model.summary()
+
+model.compile(optimizer='rmsprop', loss='sparse_categorical_crossentropy')
+es = EarlyStopping(monitor='val_loss', mode='min', verbose=1)
+
+history=model.fit([x_tr,y_tr[:,:-1]], y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1)[:,1:] ,epochs=50,callbacks=[es],batch_size=512)
+ 
+# pyplot.plot(history.history['loss'], label='train') 
+# pyplot.plot(history.history['val_loss'], label='test') 
+# pyplot.legend()
+# pyplot.show()
