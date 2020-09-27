@@ -7,10 +7,11 @@ from sklearn.model_selection import train_test_split
 from nltk.corpus import stopwords
 from tensorflow.keras.preprocessing.text import Tokenizer 
 from tensorflow.keras.preprocessing.sequence import pad_sequences   
-from tensorflow.keras.layers import Input, LSTM, Embedding, Dense, Concatenate, TimeDistributed, Bidirectional, Attention
+from tensorflow.keras.layers import Input, LSTM, Embedding, Dense, Concatenate, TimeDistributed, Bidirectional
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras import backend as K
+from attention import AttentionLayer
 import warnings
 pd.set_option("display.max_colwidth", 200)
 warnings.filterwarnings("ignore")
@@ -88,7 +89,7 @@ data.dropna(axis=0,inplace=True)
 data['cleaned_summary'] = data['cleaned_summary'].apply(lambda x : '_START_ '+ x + ' _END_')
 
 #Change accordingly
-max_len_text=80 
+max_len_text=80
 max_len_summary=10
 
 x_tr,x_val,y_tr,y_val=train_test_split(data['cleaned_text'],data['cleaned_summary'],test_size=0.1,random_state=0,shuffle=True)
@@ -126,7 +127,7 @@ y_tr    =   pad_sequences(y_tr, maxlen=max_len_summary, padding='post')
 y_val   =   pad_sequences(y_val, maxlen=max_len_summary, padding='post')
 
 y_voc_size  =   len(y_tokenizer.word_index)+1
-print('Vocab size of Summary: ', x_voc_size)
+print('Vocab size of Summary: ', y_voc_size)
 K.clear_session()
 
 latent_dim = 500 
@@ -138,7 +139,7 @@ enc_emb = Embedding(x_voc_size, latent_dim,trainable=True)(encoder_inputs)
 print('Embedding Dimensions is (batch_size, max length of string, final dimension embedding): ', enc_emb.shape)
 
 #LSTM 1 
-encoder_lstm1 = LSTM(latent_dim,return_sequences=True,return_state=True) 
+encoder_lstm1 = LSTM(latent_dim, return_sequences=True, return_state=True) 
 encoder_output1, state_h1, state_c1 = encoder_lstm1(enc_emb) 
 
 print('\nLSTM output Dimensions are (batch_size, max length of string, final dimension embedding): ', encoder_output1.shape)
@@ -152,6 +153,10 @@ encoder_output2, state_h2, state_c2 = encoder_lstm2(encoder_output1)
 #LSTM 3 
 encoder_lstm3=LSTM(latent_dim, return_state=True, return_sequences=True) 
 encoder_outputs, state_h, state_c= encoder_lstm3(encoder_output2) 
+
+print('\nLSTM output Dimensions are (batch_size, max length of string, final dimension embedding): ', encoder_outputs.shape)
+print('Hidden state (h) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_h.shape)
+print('Carry or Cell state (c) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_c.shape)
 
 
 # Set up the decoder. 
@@ -169,26 +174,33 @@ print('\nLSTM decoder Dimensions are (batch_size, max length of string, final di
 print('Hidden state (h) decoder Dimensions are (batch_size, max length of string, final dimension embedding): ', decoder_fwd_state.shape)
 print('Carry or Cell state (c) decoder Dimensions are (batch_size, max length of string, final dimension embedding): ', decoder_back_state.shape)
 
-attn_out = Attention()([encoder_outputs, decoder_outputs])
+#Attention Layer
+attn_layer = AttentionLayer(name='attention_layer') 
+attn_out, attn_states = attn_layer([encoder_outputs, decoder_outputs]) 
+
+print('Attention Layer Output shape: ', attn_out.shape)
 
 # Concat attention output and decoder LSTM output 
 decoder_concat_input = Concatenate(axis=-1, name='concat_layer')([decoder_outputs, attn_out])
 
+print('Decoder Concatenate output shape', decoder_concat_input.shape)
 #Dense layer
 decoder_dense = TimeDistributed(Dense(y_voc_size, activation='softmax')) 
 decoder_outputs = decoder_dense(decoder_concat_input)
 
+print('\n Decoder Dimensions are: ', decoder_outputs.shape)
+
 
 # Define the model
-model = Model([encoder_inputs, decoder_inputs], decoder_outputs) 
+model = Model(inputs = [encoder_inputs, decoder_inputs], outputs = decoder_outputs) 
 model.summary()
 
-model.compile(optimizer='rmsprop', loss='sparse_categorical_crossentropy')
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
 es = EarlyStopping(monitor='val_loss', mode='min', verbose=1)
 
-history=model.fit([x_tr,y_tr[:,:-1]], y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1)[:,1:] ,epochs=50,callbacks=[es],batch_size=512)
- 
-# pyplot.plot(history.history['loss'], label='train') 
-# pyplot.plot(history.history['val_loss'], label='test') 
-# pyplot.legend()
-# pyplot.show()
+
+print(x_tr.shape)
+print(y_tr.shape)
+# print(y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1).shape)
+
+history=model.fit([x_tr,y_tr[:,:-1]], y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1)[:,1:] ,epochs=50,callbacks=[es],batch_size=128, validation_data=([x_val,y_val[:,:-1]], y_val.reshape(y_val.shape[0],y_val.shape[1], 1)[:,1:]))
