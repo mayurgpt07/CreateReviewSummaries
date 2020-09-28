@@ -1,0 +1,1 @@
+For attention.py please use this [url](https://github.com/thushv89/attention_keras/)
