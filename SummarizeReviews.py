@@ -204,3 +204,95 @@ print(y_tr.shape)
 # print(y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1).shape)
 
 history=model.fit([x_tr,y_tr[:,:-1]], y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1)[:,1:] ,epochs=50,callbacks=[es],batch_size=128, validation_data=([x_val,y_val[:,:-1]], y_val.reshape(y_val.shape[0],y_val.shape[1], 1)[:,1:]))
+
+# pyplot.plot(history.history['loss'], label='train')
+# pyplot.plot(history.history['val_loss'], label='test')
+# pyplot.legend()
+# pyplot.show()
+
+reverse_target_word_index=y_tokenizer.index_word 
+reverse_source_word_index=x_tokenizer.index_word 
+target_word_index=y_tokenizer.word_index
+
+# encoder inference
+encoder_model = Model(inputs=encoder_inputs,outputs=[encoder_outputs, state_h, state_c])
+
+# decoder inference
+# Below tensors will hold the states of the previous time step
+decoder_state_input_h = Input(shape=(latent_dim,))
+decoder_state_input_c = Input(shape=(latent_dim,))
+decoder_hidden_state_input = Input(shape=(max_len_text,latent_dim))
+
+# Get the embeddings of the decoder sequence
+dec_emb2= dec_emb_layer(decoder_inputs)
+
+# To predict the next word in the sequence, set the initial states to the states from the previous time step
+decoder_outputs2, state_h2, state_c2 = decoder_lstm(dec_emb2, initial_state=[decoder_state_input_h, decoder_state_input_c])
+
+#attention inference
+attn_out_inf, attn_states_inf = attn_layer([decoder_hidden_state_input, decoder_outputs2])
+decoder_inf_concat = Concatenate(axis=-1, name='concat')([decoder_outputs2, attn_out_inf])
+
+# A dense softmax layer to generate prob dist. over the target vocabulary
+decoder_outputs2 = decoder_dense(decoder_inf_concat)
+
+# Final decoder model
+decoder_model = Model([decoder_inputs] + [decoder_hidden_state_input,decoder_state_input_h, decoder_state_input_c],[decoder_outputs2] + [state_h2, state_c2])
+
+def decode_sequence(input_seq):
+    # Encode the input as state vectors.
+    e_out, e_h, e_c = encoder_model.predict(input_seq)
+
+    # Generate empty target sequence of length 1.
+    target_seq = np.zeros((1,1))
+
+    # Chose the 'start' word as the first word of the target sequence
+    target_seq[0, 0] = target_word_index['start']
+
+    stop_condition = False
+    decoded_sentence = ''
+    while not stop_condition:
+        output_tokens, h, c = decoder_model.predict([target_seq] + [e_out, e_h, e_c])
+        # print(output_tokens)
+        print(output_tokens.shape)
+        # Sample a token
+        sampled_token_index = np.argmax(output_tokens[0, -1, :])
+        sampled_token = reverse_target_word_index[sampled_token_index]
+        print(sampled_token)
+
+        if(sampled_token!='end'):
+            decoded_sentence += ' '+sampled_token
+
+        # Exit condition: either hit max length or find stop word.
+        if (sampled_token == 'end' or len(decoded_sentence.split()) >= (max_len_summary-1)):
+            stop_condition = True
+        print(stop_condition)
+        # Update the target sequence (of length 1).
+        target_seq = np.zeros((1,1))
+        target_seq[0, 0] = sampled_token_index
+
+        # Update internal states
+        e_h, e_c = h, c
+
+    return decoded_sentence
+
+def seq2summary(input_seq):
+    newString=''
+    for i in input_seq:
+      if((i!=0 and i!=target_word_index['start']) and i!=target_word_index['end']):
+        newString=newString+reverse_target_word_index[i]+' '
+    return newString
+
+def seq2text(input_seq):
+    newString=''
+    for i in input_seq:
+      if(i!=0):
+        newString=newString+reverse_source_word_index[i]+' '
+    return newString
+
+
+for i in range(len(x_val)):
+  print("Review:",seq2text(x_val[i]))
+  print("Original summary:",seq2summary(y_val[i]))
+  print("Predicted summary:",decode_sequence(x_val[i].reshape(1,max_len_text)))
+  print("\n")
