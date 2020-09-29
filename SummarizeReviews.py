@@ -16,7 +16,7 @@ import warnings
 pd.set_option("display.max_colwidth", 200)
 warnings.filterwarnings("ignore")
 
-data=pd.read_csv("./Reviews.csv",nrows=1000)
+data=pd.read_csv("./Reviews.csv",nrows=10000)
 
 contraction_mapping = {"ain't": "is not", "aren't": "are not","can't": "cannot", "'cause": "because", "could've": "could have", "couldn't": "could not",
                            "didn't": "did not", "doesn't": "does not", "don't": "do not", "hadn't": "had not", "hasn't": "has not", "haven't": "have not",
@@ -89,7 +89,7 @@ data.dropna(axis=0,inplace=True)
 data['cleaned_summary'] = data['cleaned_summary'].apply(lambda x : '_START_ '+ x + ' _END_')
 
 #Change accordingly
-max_len_text=80
+max_len_text=100
 max_len_summary=10
 
 x_tr,x_val,y_tr,y_val=train_test_split(data['cleaned_text'],data['cleaned_summary'],test_size=0.1,random_state=0,shuffle=True)
@@ -139,24 +139,24 @@ enc_emb = Embedding(x_voc_size, latent_dim,trainable = True)(encoder_inputs)
 print('Embedding Dimensions is (batch_size, max length of string, final dimension embedding): ', enc_emb.shape)
 
 #LSTM 1 
-encoder_lstm1 = LSTM(latent_dim, return_sequences=True) 
-encoder_output1 = encoder_lstm1(enc_emb) 
+encoder_lstm1 = LSTM(latent_dim, return_sequences=True, return_state=True, dropout = 0.4) 
+encoder_output1, state_h1, state_c1 = encoder_lstm1(enc_emb) 
 
 print('\nLSTM output Dimensions are (batch_size, max length of string, final dimension embedding): ', encoder_output1.shape)
-# print('Hidden state (h) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_h1.shape)
-# print('Carry or Cell state (c) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_c1.shape)
+print('Hidden state (h) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_h1.shape)
+print('Carry or Cell state (c) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_c1.shape)
 
-#LSTM 2 
-encoder_lstm2 = LSTM(latent_dim,return_sequences=True) 
-encoder_output2 = encoder_lstm2(encoder_output1) 
+# #LSTM 2 
+# encoder_lstm2 = LSTM(latent_dim,return_sequences=True,return_state=True, dropout = 0.4) 
+# encoder_output2, state_h2, state_c2 = encoder_lstm2(encoder_output1) 
 
 #LSTM 3 
-encoder_lstm3=LSTM(latent_dim, return_state=True, return_sequences=True) 
-encoder_outputs, state_h, state_c= encoder_lstm3(encoder_output2) 
+encoder_lstm3=LSTM(latent_dim, return_state=True, return_sequences=True, dropout = 0.4) 
+encoder_outputs, state_h, state_c= encoder_lstm3(encoder_output1) 
 
 print('\nLSTM output Dimensions are (batch_size, max length of string, final dimension embedding): ', encoder_outputs.shape)
-# print('Hidden state (h) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_h.shape)
-# print('Carry or Cell state (c) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_c.shape)
+print('Hidden state (h) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_h.shape)
+print('Carry or Cell state (c) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_c.shape)
 
 
 # Set up the decoder. 
@@ -203,7 +203,7 @@ es = EarlyStopping(monitor='val_loss', mode='min', verbose=1)
 # print(y_tr[0,:-1])
 # print(y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1)[0,1:])
 
-history=model.fit([x_tr,y_tr[:,:-1]], y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1)[:,1:] ,epochs=50,callbacks=[es],batch_size=128, validation_data=([x_val,y_val[:,:-1]], y_val.reshape(y_val.shape[0],y_val.shape[1], 1)[:,1:]))
+history=model.fit([x_tr,y_tr[:,:-1]], y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1)[:,1:] ,epochs=5,batch_size=128, validation_data=([x_val,y_val[:,:-1]], y_val.reshape(y_val.shape[0],y_val.shape[1], 1)[:,1:]))
 
 pyplot.plot(history.history['loss'], label='train')
 pyplot.plot(history.history['val_loss'], label='test')
