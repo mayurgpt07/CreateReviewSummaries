@@ -16,7 +16,7 @@ import warnings
 pd.set_option("display.max_colwidth", 200)
 warnings.filterwarnings("ignore")
 
-data=pd.read_csv("./Reviews.csv",nrows=10000)
+data=pd.read_csv("./Reviews.csv",nrows=1000)
 
 contraction_mapping = {"ain't": "is not", "aren't": "are not","can't": "cannot", "'cause": "because", "could've": "could have", "couldn't": "could not",
                            "didn't": "did not", "doesn't": "does not", "don't": "do not", "hadn't": "had not", "hasn't": "has not", "haven't": "have not",
@@ -134,34 +134,34 @@ latent_dim = 500
 
 # Encoder 
 encoder_inputs = Input(shape=(max_len_text,)) 
-enc_emb = Embedding(x_voc_size, latent_dim,trainable=True)(encoder_inputs)
+enc_emb = Embedding(x_voc_size, latent_dim,trainable = True)(encoder_inputs)
 
 print('Embedding Dimensions is (batch_size, max length of string, final dimension embedding): ', enc_emb.shape)
 
 #LSTM 1 
-encoder_lstm1 = LSTM(latent_dim, return_sequences=True, return_state=True) 
-encoder_output1, state_h1, state_c1 = encoder_lstm1(enc_emb) 
+encoder_lstm1 = LSTM(latent_dim, return_sequences=True) 
+encoder_output1 = encoder_lstm1(enc_emb) 
 
 print('\nLSTM output Dimensions are (batch_size, max length of string, final dimension embedding): ', encoder_output1.shape)
-print('Hidden state (h) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_h1.shape)
-print('Carry or Cell state (c) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_c1.shape)
+# print('Hidden state (h) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_h1.shape)
+# print('Carry or Cell state (c) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_c1.shape)
 
 #LSTM 2 
-encoder_lstm2 = LSTM(latent_dim,return_sequences=True,return_state=True) 
-encoder_output2, state_h2, state_c2 = encoder_lstm2(encoder_output1) 
+encoder_lstm2 = LSTM(latent_dim,return_sequences=True) 
+encoder_output2 = encoder_lstm2(encoder_output1) 
 
 #LSTM 3 
 encoder_lstm3=LSTM(latent_dim, return_state=True, return_sequences=True) 
 encoder_outputs, state_h, state_c= encoder_lstm3(encoder_output2) 
 
 print('\nLSTM output Dimensions are (batch_size, max length of string, final dimension embedding): ', encoder_outputs.shape)
-print('Hidden state (h) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_h.shape)
-print('Carry or Cell state (c) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_c.shape)
+# print('Hidden state (h) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_h.shape)
+# print('Carry or Cell state (c) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_c.shape)
 
 
 # Set up the decoder. 
 decoder_inputs = Input(shape=(None,)) 
-dec_emb_layer = Embedding(y_voc_size, latent_dim,trainable=True) 
+dec_emb_layer = Embedding(y_voc_size, latent_dim, trainable = True) 
 dec_emb = dec_emb_layer(decoder_inputs) 
 
 print('\nEmbedding Dimensions for summary is (batch_size, max length of string, final dimension embedding): ', dec_emb.shape)
@@ -199,16 +199,16 @@ model.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
 es = EarlyStopping(monitor='val_loss', mode='min', verbose=1)
 
 
-print(x_tr.shape)
-print(y_tr.shape)
-# print(y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1).shape)
+# print(x_tr[0])
+# print(y_tr[0,:-1])
+# print(y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1)[0,1:])
 
 history=model.fit([x_tr,y_tr[:,:-1]], y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1)[:,1:] ,epochs=50,callbacks=[es],batch_size=128, validation_data=([x_val,y_val[:,:-1]], y_val.reshape(y_val.shape[0],y_val.shape[1], 1)[:,1:]))
 
-# pyplot.plot(history.history['loss'], label='train')
-# pyplot.plot(history.history['val_loss'], label='test')
-# pyplot.legend()
-# pyplot.show()
+pyplot.plot(history.history['loss'], label='train')
+pyplot.plot(history.history['val_loss'], label='test')
+pyplot.legend()
+pyplot.show()
 
 reverse_target_word_index=y_tokenizer.index_word 
 reverse_source_word_index=x_tokenizer.index_word 
@@ -216,7 +216,7 @@ target_word_index=y_tokenizer.word_index
 
 # encoder inference
 encoder_model = Model(inputs=encoder_inputs,outputs=[encoder_outputs, state_h, state_c])
-
+print(encoder_model.summary())
 # decoder inference
 # Below tensors will hold the states of the previous time step
 decoder_state_input_h = Input(shape=(latent_dim,))
@@ -229,7 +229,7 @@ dec_emb2= dec_emb_layer(decoder_inputs)
 # To predict the next word in the sequence, set the initial states to the states from the previous time step
 decoder_outputs2, state_h2, state_c2 = decoder_lstm(dec_emb2, initial_state=[decoder_state_input_h, decoder_state_input_c])
 
-#attention inference
+# Attention inference
 attn_out_inf, attn_states_inf = attn_layer([decoder_hidden_state_input, decoder_outputs2])
 decoder_inf_concat = Concatenate(axis=-1, name='concat')([decoder_outputs2, attn_out_inf])
 
@@ -241,8 +241,13 @@ decoder_model = Model([decoder_inputs] + [decoder_hidden_state_input,decoder_sta
 
 def decode_sequence(input_seq):
     # Encode the input as state vectors.
+
+    # print(input_seq)
     e_out, e_h, e_c = encoder_model.predict(input_seq)
 
+    # print('Output States:', e_out)
+    # print('Hidden States:', e_h)
+    # print('Cell States:', e_c)
     # Generate empty target sequence of length 1.
     target_seq = np.zeros((1,1))
 
@@ -291,8 +296,8 @@ def seq2text(input_seq):
     return newString
 
 
-for i in range(len(x_val)):
-  print("Review:",seq2text(x_val[i]))
-  print("Original summary:",seq2summary(y_val[i]))
-  print("Predicted summary:",decode_sequence(x_val[i].reshape(1,max_len_text)))
-  print("\n")
+for i in range(5):
+    print("Review:",seq2text(x_val[i]))
+    print("Original summary:",seq2summary(y_val[i]))
+    print("Predicted summary:",decode_sequence(x_val[i].reshape(1, max_len_text)))
+    print("\n")
