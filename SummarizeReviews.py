@@ -16,7 +16,7 @@ import warnings
 pd.set_option("display.max_colwidth", 200)
 warnings.filterwarnings("ignore")
 
-data=pd.read_csv("./Reviews.csv",nrows=10000)
+data=pd.read_csv("./Reviews.csv",nrows=100000)
 
 contraction_mapping = {"ain't": "is not", "aren't": "are not","can't": "cannot", "'cause": "because", "could've": "could have", "couldn't": "could not",
                            "didn't": "did not", "doesn't": "does not", "don't": "do not", "hadn't": "had not", "hasn't": "has not", "haven't": "have not",
@@ -47,7 +47,7 @@ def text_cleaner(text):
     newString = text.lower()
     newString = BeautifulSoup(newString, "lxml").text
     newString = re.sub(r'\([^)]*\)', '', newString)
-    newString = re.sub('"','', newString)
+    newString = re.sub('"','', str(newString))
     newString = ' '.join([contraction_mapping[t] if t in contraction_mapping else t for t in newString.split(" ")])    
     newString = re.sub(r"'s\b","",newString)
     newString = re.sub("[^a-zA-Z]", " ", newString)
@@ -64,7 +64,7 @@ for t in data['Text']:
 
 
 def summary_cleaner(text):
-    newString = re.sub('"','', text)
+    newString = re.sub('"','', str(text))
     newString = ' '.join([contraction_mapping[t] if t in contraction_mapping else t for t in newString.split(" ")])    
     newString = re.sub(r"'s\b","",newString)
     newString = re.sub("[^a-zA-Z]", " ", newString)
@@ -146,13 +146,13 @@ print('\nLSTM output Dimensions are (batch_size, max length of string, final dim
 print('Hidden state (h) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_h1.shape)
 print('Carry or Cell state (c) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_c1.shape)
 
-# #LSTM 2 
-# encoder_lstm2 = LSTM(latent_dim,return_sequences=True,return_state=True, dropout = 0.4) 
-# encoder_output2, state_h2, state_c2 = encoder_lstm2(encoder_output1) 
+#LSTM 2 
+encoder_lstm2 = LSTM(latent_dim,return_sequences=True,return_state=True, dropout = 0.4) 
+encoder_output2, state_h2, state_c2 = encoder_lstm2(encoder_output1) 
 
 #LSTM 3 
 encoder_lstm3=LSTM(latent_dim, return_state=True, return_sequences=True, dropout = 0.4) 
-encoder_outputs, state_h, state_c= encoder_lstm3(encoder_output1) 
+encoder_outputs, state_h, state_c= encoder_lstm3(encoder_output2) 
 
 print('\nLSTM output Dimensions are (batch_size, max length of string, final dimension embedding): ', encoder_outputs.shape)
 print('Hidden state (h) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_h.shape)
@@ -203,7 +203,7 @@ es = EarlyStopping(monitor='val_loss', mode='min', verbose=1)
 # print(y_tr[0,:-1])
 # print(y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1)[0,1:])
 
-history=model.fit([x_tr,y_tr[:,:-1]], y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1)[:,1:] ,epochs=5,batch_size=128, validation_data=([x_val,y_val[:,:-1]], y_val.reshape(y_val.shape[0],y_val.shape[1], 1)[:,1:]))
+history=model.fit([x_tr,y_tr[:,:-1]], y_tr.reshape(y_tr.shape[0],y_tr.shape[1], 1)[:,1:] ,epochs=10,batch_size=256, validation_data=([x_val,y_val[:,:-1]], y_val.reshape(y_val.shape[0],y_val.shape[1], 1)[:,1:]))
 
 pyplot.plot(history.history['loss'], label='train')
 pyplot.plot(history.history['val_loss'], label='test')
@@ -296,7 +296,7 @@ def seq2text(input_seq):
     return newString
 
 
-for i in range(5):
+for i in range(10):
     print("Review:",seq2text(x_val[i]))
     print("Original summary:",seq2summary(y_val[i]))
     print("Predicted summary:",decode_sequence(x_val[i].reshape(1, max_len_text)))
