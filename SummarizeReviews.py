@@ -11,6 +11,7 @@ from tensorflow.keras.layers import Input, LSTM, Embedding, Dense, Concatenate, 
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras import backend as K
+from tensorflow.keras.regularizers import l2, l1
 from attention import AttentionLayer
 import warnings
 pd.set_option("display.max_colwidth", 200)
@@ -89,7 +90,7 @@ data.dropna(axis=0,inplace=True)
 data['cleaned_summary'] = data['cleaned_summary'].apply(lambda x : '_START_ '+ x + ' _END_')
 
 #Change accordingly
-max_len_text=100
+max_len_text=70
 max_len_summary=10
 
 x_tr,x_val,y_tr,y_val=train_test_split(data['cleaned_text'],data['cleaned_summary'],test_size=0.1,random_state=0,shuffle=True)
@@ -139,7 +140,7 @@ enc_emb = Embedding(x_voc_size, latent_dim,trainable = True)(encoder_inputs)
 print('Embedding Dimensions is (batch_size, max length of string, final dimension embedding): ', enc_emb.shape)
 
 #LSTM 1 
-encoder_lstm1 = LSTM(latent_dim, return_sequences=True, return_state=True, dropout = 0.4) 
+encoder_lstm1 = LSTM(latent_dim, activation = 'relu',return_sequences=True, return_state=True, dropout = 0.5, recurrent_regularizer=l1(0.01)) 
 encoder_output1, state_h1, state_c1 = encoder_lstm1(enc_emb) 
 
 print('\nLSTM output Dimensions are (batch_size, max length of string, final dimension embedding): ', encoder_output1.shape)
@@ -147,11 +148,11 @@ print('Hidden state (h) Dimensions are (batch_size, max length of string, final 
 print('Carry or Cell state (c) Dimensions are (batch_size, max length of string, final dimension embedding): ', state_c1.shape)
 
 #LSTM 2 
-encoder_lstm2 = LSTM(latent_dim,return_sequences=True,return_state=True, dropout = 0.4) 
+encoder_lstm2 = LSTM(latent_dim, activation = 'relu',return_sequences=True,return_state=True, dropout = 0.5, recurrent_regularizer=l1(0.01)) 
 encoder_output2, state_h2, state_c2 = encoder_lstm2(encoder_output1) 
 
 #LSTM 3 
-encoder_lstm3=LSTM(latent_dim, return_state=True, return_sequences=True, dropout = 0.4) 
+encoder_lstm3=LSTM(latent_dim, activation = 'relu', return_state=True, return_sequences=True, dropout = 0.5, recurrent_regularizer=l1(0.01)) 
 encoder_outputs, state_h, state_c= encoder_lstm3(encoder_output2) 
 
 print('\nLSTM output Dimensions are (batch_size, max length of string, final dimension embedding): ', encoder_outputs.shape)
@@ -167,7 +168,7 @@ dec_emb = dec_emb_layer(decoder_inputs)
 print('\nEmbedding Dimensions for summary is (batch_size, max length of string, final dimension embedding): ', dec_emb.shape)
 
 #LSTM using encoder_states as initial state
-decoder_lstm = LSTM(latent_dim, return_sequences=True, return_state=True) 
+decoder_lstm = LSTM(latent_dim, return_sequences=True, return_state=True,dropout = 0.5) 
 decoder_outputs,decoder_fwd_state, decoder_back_state = decoder_lstm(dec_emb,initial_state=[state_h, state_c]) 
 
 print('\nLSTM decoder Dimensions are (batch_size, max length of string, final dimension embedding): ', decoder_outputs.shape)
