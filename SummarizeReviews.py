@@ -17,7 +17,7 @@ import warnings
 pd.set_option("display.max_colwidth", 200)
 warnings.filterwarnings("ignore")
 
-data=pd.read_csv("./Reviews.csv",nrows=80000)
+data=pd.read_csv("./Reviews.csv",nrows=50000)
 
 contraction_mapping = {"ain't": "is not", "aren't": "are not","can't": "cannot", "'cause": "because", "could've": "could have", "couldn't": "could not",
                            "didn't": "did not", "doesn't": "does not", "don't": "do not", "hadn't": "had not", "hasn't": "has not", "haven't": "have not",
@@ -140,7 +140,7 @@ enc_emb = Embedding(x_voc_size, latent_dim,trainable = True)(encoder_inputs)
 # print('Embedding Dimensions is (batch_size, max length of string, final dimension embedding): ', enc_emb.shape)
 
 #LSTM 1 
-encoder_lstm1 = LSTM(latent_dim, activation = 'relu',return_sequences=True, return_state=True, recurrent_dropout = 0.1, recurrent_regularizer = l1(0.1)) 
+encoder_lstm1 = LSTM(latent_dim, activation = 'relu',return_sequences=True, return_state=True, recurrent_dropout = 0.4, recurrent_regularizer = l1(0.01)) 
 encoder_output1, state_h1, state_c1 = encoder_lstm1(enc_emb) 
 
 # print('\nLSTM output Dimensions are (batch_size, max length of string, final dimension embedding): ', encoder_output1.shape)
@@ -152,7 +152,7 @@ encoder_output1, state_h1, state_c1 = encoder_lstm1(enc_emb)
 # encoder_output2, state_h2, state_c2 = encoder_lstm2(encoder_output1) 
 
 #LSTM 3 
-encoder_lstm3=LSTM(latent_dim, activation = 'relu', return_state=True, return_sequences=True, recurrent_dropout = 0.1, recurrent_regularizer = l1(0.1)) 
+encoder_lstm3=LSTM(latent_dim, activation = 'relu', return_state=True, return_sequences=True, recurrent_dropout = 0.4, recurrent_regularizer = l1(0.2)) 
 encoder_outputs, state_h, state_c= encoder_lstm3(encoder_output1) 
 
 # print('\nLSTM output Dimensions are (batch_size, max length of string, final dimension embedding): ', encoder_outputs.shape)
